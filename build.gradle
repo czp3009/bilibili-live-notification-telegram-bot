@@ -10,7 +10,7 @@ buildscript {
 }
 
 group 'com.hiczp'
-version '0.0.1'
+version '1.0.0'
 
 apply plugin: 'kotlin'
 
@@ -38,4 +38,10 @@ dependencies {
     compile group: 'com.hiczp', name: 'bilibili-api', version: '0.0.16'
     // https://mvnrepository.com/artifact/org.slf4j/slf4j-log4j12
     compile group: 'org.slf4j', name: 'slf4j-log4j12', version: '1.7.25'
+}
+
+jar {
+    from {
+        configurations.compile.collect { it.isDirectory() ? it : zipTree(it) }
+    }
 }
