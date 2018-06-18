@@ -10,7 +10,7 @@ Bilibili 直播开播提醒 Telegram 机器人, 当目标直播间(复数)开始
 
 运行
 
-    java -jar bilibili-live-notification-telegram-bot-{version}.jar
+    java -jar bilibili-live-notification-telegram-bot-{version}-all.jar
 
 (version 为版本号)
 
