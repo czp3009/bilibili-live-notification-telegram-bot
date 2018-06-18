@@ -2,7 +2,9 @@ package com.hiczp.bilibili.notificationTelegrambot
 
 import com.google.common.eventbus.Subscribe
 import com.hiczp.bilibili.api.BilibiliAPI
+import com.hiczp.bilibili.api.live.socket.LiveClient
 import com.hiczp.bilibili.api.live.socket.event.ConnectSucceedEvent
+import com.hiczp.bilibili.api.live.socket.event.ConnectionCloseEvent
 import com.hiczp.bilibili.api.live.socket.event.CutOffPackageEvent
 import com.hiczp.bilibili.api.live.socket.event.ReceiveRoomStatusPackageEvent
 import io.netty.channel.nio.NioEventLoopGroup
@@ -17,6 +19,11 @@ import org.telegram.telegrambots.ApiContext
 import org.telegram.telegrambots.ApiContextInitializer
 import org.telegram.telegrambots.TelegramBotsApi
 import org.telegram.telegrambots.bots.DefaultBotOptions
+import java.io.IOException
+import java.util.concurrent.DelayQueue
+import kotlin.concurrent.thread
+
+private const val reconnectDelay = 5L
 
 fun main(args: Array<String>) {
     //logger
@@ -61,6 +68,8 @@ fun main(args: Array<String>) {
             logger.warn("RoomIds not set")
             return@run
         }
+
+        val delayQueue = DelayQueue<DelayedElement<LiveClient>>()
         val eventLoopGroup = NioEventLoopGroup()
         BilibiliAPI().run {
             forEach {
@@ -81,10 +90,36 @@ fun main(args: Array<String>) {
                                     fun onCutOff(cutOffPackageEvent: CutOffPackageEvent) {
                                         notificationBot.sendNotification(cutOffPackageEvent.entity.roomId.toLong())
                                     }
+
+                                    @Subscribe
+                                    fun onDisconnect(connectionCloseEvent: ConnectionCloseEvent) {
+                                        connectionCloseEvent.source0.run {
+                                            logger.error("Connection to room $showRoomIdOrRoomId lost, we will reconnect after ${reconnectDelay}s")
+                                            delayQueue.put(DelayedElement(this, reconnectDelay * 1000))
+                                        }
+                                    }
                                 }
                         )
                         .connect()
             }
         }
+
+        //重连线程
+        thread(true, true, block = {
+            while (true) {
+                try {
+                    delayQueue.take().element.run {
+                        try {
+                            connect()
+                        } catch (e: IOException) {
+                            logger.error(e.message)
+                            eventBus.post(ConnectionCloseEvent(this))
+                        }
+                    }
+                } catch (e: InterruptedException) {
+                    break
+                }
+            }
+        })
     }
 }

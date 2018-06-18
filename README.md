@@ -52,7 +52,7 @@ liveRoomIds 为程序需要监听的直播间号码, 可以有多个.
 
 执行命令行
 
-    ./gradlew jar
+    ./gradlew shadowJar
 
 # 普通命令
 注意, 以下所指的 "命令" 都是 telegram 中的机器人指令.
