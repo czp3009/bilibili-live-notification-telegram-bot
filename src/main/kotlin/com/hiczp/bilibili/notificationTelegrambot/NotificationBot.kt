@@ -25,6 +25,7 @@ class NotificationBot(username: String,
                       defaultBotOptions: DefaultBotOptions) : AbilityBot(token, username, defaultBotOptions) {
     override fun creatorId() = creatorId
 
+    @Suppress("unused", "HasPlatformType")
     fun enable() =
             Ability.builder()
                     .name("enable")
@@ -37,6 +38,7 @@ class NotificationBot(username: String,
                     }
                     .build()
 
+    @Suppress("unused", "HasPlatformType")
     fun disable() =
             Ability.builder()
                     .name("disable")
@@ -49,6 +51,7 @@ class NotificationBot(username: String,
                     }
                     .build()
 
+    @Suppress("unused", "HasPlatformType")
     fun room() =
             Ability.builder()
                     .name("room")
@@ -174,7 +177,7 @@ class NotificationBot(username: String,
                 }
             }
 
-    private fun buildUrlString(roomId: Int) =
+    private fun buildUrlString(roomId: Long) =
             LIVE_BASE_URL + roomId
 
     companion object {

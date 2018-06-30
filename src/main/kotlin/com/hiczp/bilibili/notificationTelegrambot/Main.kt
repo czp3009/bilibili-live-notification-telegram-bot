@@ -76,21 +76,25 @@ fun main(args: Array<String>) {
                 getLiveClient(eventLoopGroup, it)
                         .registerListener(
                                 object : Any() {
+                                    @Suppress("unused")
                                     @Subscribe
                                     fun onConnectSucceed(connectSucceedEvent: ConnectSucceedEvent) {
                                         logger.info("Enter room ${connectSucceedEvent.source0.showRoomIdOrRoomId} succeed")
                                     }
 
+                                    @Suppress("unused")
                                     @Subscribe
                                     fun onRoomStatusChange(receiveRoomStatusPackageEvent: ReceiveRoomStatusPackageEvent<*>) {
                                         notificationBot.sendNotification(receiveRoomStatusPackageEvent.entity.roomId.toLong())
                                     }
 
+                                    @Suppress("unused")
                                     @Subscribe
                                     fun onCutOff(cutOffPackageEvent: CutOffPackageEvent) {
-                                        notificationBot.sendNotification(cutOffPackageEvent.entity.roomId.toLong())
+                                        notificationBot.sendNotification(cutOffPackageEvent.entity.roomId)
                                     }
 
+                                    @Suppress("unused")
                                     @Subscribe
                                     fun onDisconnect(connectionCloseEvent: ConnectionCloseEvent) {
                                         connectionCloseEvent.source0.run {
