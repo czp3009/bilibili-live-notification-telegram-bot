@@ -78,7 +78,7 @@ bot 的管理命令在初始状态下仅配置文件中的 creatorId 指定的�
 
 更多管理命令和用法详见 https://github.com/rubenlagus/TelegramBots/wiki/Simple-Example#testing-your-bot
 
-# 注册命令
+# 聊天栏命令补全
 如果你需要你的机器人有聊天栏命令补全, 那么你就需要向 BotFather 注册你的机器人指令.
 
 首先, 开启与 BotFather 的聊天 https://telegram.me/botfather
