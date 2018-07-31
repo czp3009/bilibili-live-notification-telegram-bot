@@ -33,7 +33,11 @@ class NotificationBot(username: String,
                     .locality(Locality.GROUP)
                     .privacy(Privacy.GROUP_ADMIN)
                     .action {
-                        db.getSet<Long>(ENABLED_GROUP).add(it.chatId())
+                        db.run {
+                            getSet<Long>(ENABLED_GROUP).add(it.chatId())
+                            commit()    //修复由于强制中断程序而导致的一部分数据未存入磁盘的问题 https://github.com/czp3009/bilibili-live-notification-telegram-bot/issues/2
+                            logger.info("Enabled notification in group ${it.chatId()}")
+                        }
                         silent.send("Enabled notification push", it.chatId())
                     }
                     .build()
@@ -46,7 +50,11 @@ class NotificationBot(username: String,
                     .locality(Locality.GROUP)
                     .privacy(Privacy.GROUP_ADMIN)
                     .action {
-                        db.getSet<Long>(ENABLED_GROUP).remove(it.chatId())
+                        db.run {
+                            getSet<Long>(ENABLED_GROUP).remove(it.chatId())
+                            commit()
+                            logger.info("Disabled notification in group ${it.chatId()}")
+                        }
                         silent.send("Disabled notification push", it.chatId())
                     }
                     .build()
@@ -67,6 +75,7 @@ class NotificationBot(username: String,
                             executeAsync(SendMessage(chatId, "Argument roomId must be a valid number"), NormalSentCallback(it))
                             return@action
                         }.run {
+                            logger.info("User ${it.user().username()} toggle 'room' command")
                             liveService.getRoomInfo(this).enqueue(
                                     object : Callback<LiveRoomInfoEntity> {
                                         override fun onResponse(call: Call<LiveRoomInfoEntity>, response: Response<LiveRoomInfoEntity>) {
@@ -105,63 +114,66 @@ class NotificationBot(username: String,
                     }
                     .build()
 
-    fun sendNotification(roomId: Long) =
-            db.getSet<Long>(ENABLED_GROUP).run {
-                if (isEmpty()) {
-                    logger.warn("No group enabled notification")
-                    return
-                }
-                liveService.getRoomInfo(roomId).enqueue(
-                        object : Callback<LiveRoomInfoEntity> {
-                            override fun onResponse(call: Call<LiveRoomInfoEntity>, response: Response<LiveRoomInfoEntity>) {
-                                if (!response.isSuccessful) {
-                                    logger.error("fetch room info failed: ${response.message()}")
+    fun sendNotification(roomId: Long) {
+        logger.info("Room $roomId changed status")
+        db.getSet<Long>(ENABLED_GROUP).run {
+            if (isEmpty()) {
+                logger.warn("No group enabled notification")
+                return
+            }
+            logger.info("Preparing send notification to $size groups")
+            liveService.getRoomInfo(roomId).enqueue(
+                    object : Callback<LiveRoomInfoEntity> {
+                        override fun onResponse(call: Call<LiveRoomInfoEntity>, response: Response<LiveRoomInfoEntity>) {
+                            if (!response.isSuccessful) {
+                                logger.error("fetch room info failed: ${response.message()}")
+                                return
+                            }
+                            response.body()?.run {
+                                if (code != ServerErrorCode.Common.OK) {
+                                    logger.error("fetch room info failed: $message")
                                     return
                                 }
-                                response.body()?.run {
-                                    if (code != ServerErrorCode.Common.OK) {
-                                        logger.error("fetch room info failed: $message")
-                                        return
-                                    }
-                                    data.run {
-                                        StringBuilder()
-                                                .appendln("Room $showRoomId changed status to $status")
-                                                .appendln("Title: $title")
-                                                .appendln("HostName: $username")
-                                                .appendln("Category: ${buildCategoryString(this)}")
-                                                .appendln(buildUrlString(showRoomId))
-                                                .toString()
-                                                .let { message ->
-                                                    forEach {
-                                                        executeAsync(
-                                                                SendMessage(it, message),
-                                                                object : SentCallback<Message> {
-                                                                    override fun onResult(method: BotApiMethod<Message>, response: Message) {
-
-                                                                    }
-
-                                                                    override fun onException(method: BotApiMethod<Message>, exception: Exception) {
-                                                                        exception.printStackTrace()
-                                                                        logger.error("Error occurred when push notification to chat group $it")
-                                                                    }
-
-                                                                    override fun onError(method: BotApiMethod<Message>, apiException: TelegramApiRequestException) {
-                                                                        logger.warn(apiException.message)
-                                                                    }
+                                data.run {
+                                    StringBuilder()
+                                            .appendln("Room $showRoomId changed status to $status")
+                                            .appendln("Title: $title")
+                                            .appendln("HostName: $username")
+                                            .appendln("Category: ${buildCategoryString(this)}")
+                                            .appendln(buildUrlString(showRoomId))
+                                            .toString()
+                                            .let { message ->
+                                                forEach {
+                                                    executeAsync(
+                                                            SendMessage(it, message),
+                                                            object : SentCallback<Message> {
+                                                                override fun onResult(method: BotApiMethod<Message>, response: Message) {
+                                                                    logger.info("Send notification to group $it succeed")
                                                                 }
-                                                        )
-                                                    }
-                                                }
-                                    }
-                                } ?: logger.error("server return empty body")
-                            }
 
-                            override fun onFailure(call: Call<LiveRoomInfoEntity>, t: Throwable) {
-                                t.printStackTrace()
-                            }
+                                                                override fun onException(method: BotApiMethod<Message>, exception: Exception) {
+                                                                    exception.printStackTrace()
+                                                                    logger.error("Error occurred when push notification to chat group $it")
+                                                                }
+
+                                                                override fun onError(method: BotApiMethod<Message>, apiException: TelegramApiRequestException) {
+                                                                    logger.warn(apiException.message)
+                                                                }
+                                                            }
+                                                    )
+                                                }
+                                            }
+                                }
+                            } ?: logger.error("server return empty body")
                         }
-                )
-            }
+
+                        override fun onFailure(call: Call<LiveRoomInfoEntity>, t: Throwable) {
+                            t.printStackTrace()
+                        }
+                    }
+            )
+        }
+    }
 
     private fun buildCategoryString(liveRoom: LiveRoomInfoEntity.LiveRoom) =
             liveRoom.run {

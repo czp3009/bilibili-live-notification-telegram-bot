@@ -14,6 +14,8 @@ import org.apache.http.auth.UsernamePasswordCredentials
 import org.apache.http.client.config.RequestConfig
 import org.apache.http.impl.client.BasicCredentialsProvider
 import org.apache.log4j.BasicConfigurator
+import org.apache.log4j.Level
+import org.apache.log4j.Logger
 import org.slf4j.LoggerFactory
 import org.telegram.telegrambots.ApiContext
 import org.telegram.telegrambots.ApiContextInitializer
@@ -28,6 +30,8 @@ private const val reconnectDelay = 5L
 fun main(args: Array<String>) {
     //logger
     BasicConfigurator.configure()
+    Logger.getRootLogger().level = Level.INFO
+
     val logger = LoggerFactory.getLogger("Application")
 
     //init
