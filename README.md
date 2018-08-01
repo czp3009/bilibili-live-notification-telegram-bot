@@ -19,6 +19,7 @@ Bilibili 直播开播提醒 Telegram 机器人, 当目标直播间(复数)开始
 正确的配置文件大致如下
 
     {
+      "logLevel": "INFO",
       "telegramBotConfig": {
         "username": "czp_bot",
         "token": "381487180:AHFRIcngHfYZ7JihahXVB3zqkqpIUjTQrdk",

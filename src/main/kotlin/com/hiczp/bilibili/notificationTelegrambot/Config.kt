@@ -1,35 +1,38 @@
 package com.hiczp.bilibili.notificationTelegrambot
 
 import com.google.gson.GsonBuilder
-import org.slf4j.LoggerFactory
-import java.nio.file.Paths
+import java.io.File
 import java.util.*
 
 object ApplicationConfig {
-    private const val CONFIG_FILE_NAME = "config.json"
-    private val logger = LoggerFactory.getLogger(ApplicationConfig::class.java)
-    private val GSON = GsonBuilder().setPrettyPrinting().create()
+    const val CONFIG_FILE_NAME = "config.json"
+    private val CONFIG_FILE = File(CONFIG_FILE_NAME)
+    private val GSON = GsonBuilder().setPrettyPrinting().serializeNulls().create()
 
-    private val config = lazy { readConfigFromDisk() }
+    @Suppress("HasPlatformType")
+    lateinit var config: Config
 
-    val telegramBotConfig = config.value.telegramBotConfig
-    val liveRoomIds = config.value.liveRoomIds
+    fun isConfigFileExists() = CONFIG_FILE.exists()
 
-    private fun readConfigFromDisk() =
-            Paths.get(CONFIG_FILE_NAME).toFile().run {
-                if (exists()) {
-                    GSON.fromJson(readText(), Config::class.java)
-                } else {
-                    logger.info("Config file not exists, creating new one")
-                    Config().also {
-                        createNewFile()
-                        writeText(GSON.toJson(it))
-                    }
-                }
+    fun createConfigFile() {
+        config = Config().also {
+            CONFIG_FILE.run {
+                createNewFile()
+                writeText(GSON.toJson(it))
             }
+        }
+    }
+
+    fun writeConfigToDisk() =
+            CONFIG_FILE.writeText(GSON.toJson(config))
+
+    fun readConfigFromDisk() {
+        config = GSON.fromJson(CONFIG_FILE.readText(), Config::class.java)
+    }
 }
 
-private data class Config(
+data class Config(
+        val logLevel: String = "INFO",
         val telegramBotConfig: TelegramBotConfig = TelegramBotConfig(),
         val liveRoomIds: List<Long> = Collections.emptyList()
 )

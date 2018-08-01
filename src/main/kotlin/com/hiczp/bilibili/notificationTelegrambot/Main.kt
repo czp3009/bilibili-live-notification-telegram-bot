@@ -1,6 +1,7 @@
 package com.hiczp.bilibili.notificationTelegrambot
 
 import com.google.common.eventbus.Subscribe
+import com.google.gson.JsonSyntaxException
 import com.hiczp.bilibili.api.BilibiliAPI
 import com.hiczp.bilibili.api.live.socket.LiveClient
 import com.hiczp.bilibili.api.live.socket.event.ConnectSucceedEvent
@@ -24,22 +25,47 @@ import org.telegram.telegrambots.bots.DefaultBotOptions
 import java.io.IOException
 import java.util.concurrent.DelayQueue
 import kotlin.concurrent.thread
+import kotlin.system.exitProcess
 
 private const val reconnectDelay = 5L
 
 fun main(args: Array<String>) {
     //logger
     BasicConfigurator.configure()
-    Logger.getRootLogger().level = Level.INFO
-
     val logger = LoggerFactory.getLogger("Application")
+
+    //config
+    if (ApplicationConfig.isConfigFileExists()) {
+        //读取配置文件
+        try {
+            ApplicationConfig.readConfigFromDisk()
+        } catch (e: JsonSyntaxException) {
+            e.printStackTrace()
+            logger.error("Invalid configuration, modify config file and try again or delete for auto generation")
+            exitProcess(-1)
+        }
+        logger.info("Configuration loaded, log level: ${ApplicationConfig.config.logLevel}")
+
+        //回写配置文件以实现文件内容更新
+        Runtime.getRuntime().addShutdownHook(Thread {
+            ApplicationConfig.writeConfigToDisk()
+        })
+    } else {
+        logger.error("Config file not exists")
+        ApplicationConfig.createConfigFile()
+        logger.info("Created new config file '${ApplicationConfig.CONFIG_FILE_NAME}', please edit this file and restart program")
+        exitProcess(-2)
+    }
+
+    //log level
+    Logger.getRootLogger().level = Level.toLevel(ApplicationConfig.config.logLevel)
 
     //init
     ApiContextInitializer.init()
 
     //proxy
     val defaultBotOptions = ApiContext.getInstance(DefaultBotOptions::class.java).apply {
-        ApplicationConfig.telegramBotConfig.httpProxyConfig.run {
+        ApplicationConfig.config.telegramBotConfig.httpProxyConfig.run {
             if (!useHttpProxy) return@run
             HttpHost(hostName, port).let {
                 requestConfig = RequestConfig.custom().setProxy(it).setAuthenticationEnabled(authenticationEnabled).build()
@@ -58,7 +84,7 @@ fun main(args: Array<String>) {
 
     //start bot
     logger.info("Connecting to telegram server")
-    val notificationBot = ApplicationConfig.telegramBotConfig.run {
+    val notificationBot = ApplicationConfig.config.telegramBotConfig.run {
         NotificationBot(username, token, creatorId, defaultBotOptions).also {
             TelegramBotsApi().registerBot(it)
         }
@@ -67,7 +93,7 @@ fun main(args: Array<String>) {
 
     //bilibili
     logger.info("Preparing to connect to bilibili server")
-    ApplicationConfig.liveRoomIds.run {
+    ApplicationConfig.config.liveRoomIds.run {
         if (isEmpty()) {
             logger.warn("RoomIds not set")
             return@run
@@ -76,6 +102,24 @@ fun main(args: Array<String>) {
         val delayQueue = DelayQueue<DelayedElement<LiveClient>>()
         val eventLoopGroup = NioEventLoopGroup()
         BilibiliAPI().run {
+            //重连线程
+            thread(true, true, block = {
+                while (true) {
+                    try {
+                        delayQueue.take().element.run {
+                            try {
+                                connect()
+                            } catch (e: IOException) {
+                                logger.error(e.message)
+                                eventBus.post(ConnectionCloseEvent(this))
+                            }
+                        }
+                    } catch (e: InterruptedException) {
+                        break
+                    }
+                }
+            })
+
             forEach {
                 getLiveClient(eventLoopGroup, it)
                         .registerListener(
@@ -111,23 +155,5 @@ fun main(args: Array<String>) {
                         .connect()
             }
         }
-
-        //重连线程
-        thread(true, true, block = {
-            while (true) {
-                try {
-                    delayQueue.take().element.run {
-                        try {
-                            connect()
-                        } catch (e: IOException) {
-                            logger.error(e.message)
-                            eventBus.post(ConnectionCloseEvent(this))
-                        }
-                    }
-                } catch (e: InterruptedException) {
-                    break
-                }
-            }
-        })
     }
 }
