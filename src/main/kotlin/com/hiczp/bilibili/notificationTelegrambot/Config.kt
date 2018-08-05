@@ -41,6 +41,7 @@ data class TelegramBotConfig(
         val username: String = "username",
         val token: String = "token",
         val creatorId: Int = 0,
+        val enableLinkPreview: Boolean = false,
         val httpProxyConfig: HttpProxyConfig = HttpProxyConfig()
 ) {
     data class HttpProxyConfig(

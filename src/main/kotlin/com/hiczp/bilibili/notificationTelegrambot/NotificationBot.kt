@@ -99,8 +99,14 @@ class NotificationBot(username: String,
                                                         else -> "Fetch room info failed: $message"
                                                     }
                                                 } ?: "[ERROR] Server return empty body"
-                                            }.run {
-                                                silent.send(this, chatId)
+                                            }.let {
+                                                SendMessage(chatId, it).apply {
+                                                    if (!ApplicationConfig.config.telegramBotConfig.enableLinkPreview) {
+                                                        disableWebPagePreview()
+                                                    }
+                                                }.run {
+                                                    silent.execute(this)
+                                                }
                                             }
                                         }
 
@@ -145,7 +151,11 @@ class NotificationBot(username: String,
                                             .let { message ->
                                                 forEach {
                                                     executeAsync(
-                                                            SendMessage(it, message),
+                                                            SendMessage(it, message).apply {
+                                                                if (!ApplicationConfig.config.telegramBotConfig.enableLinkPreview) {
+                                                                    disableWebPagePreview()
+                                                                }
+                                                            },
                                                             object : SentCallback<Message> {
                                                                 override fun onResult(method: BotApiMethod<Message>, response: Message) {
                                                                     logger.info("Send notification to group $it succeed")
@@ -158,6 +168,13 @@ class NotificationBot(username: String,
 
                                                                 override fun onError(method: BotApiMethod<Message>, apiException: TelegramApiRequestException) {
                                                                     logger.warn(apiException.message)
+                                                                    if (apiException.apiResponse == "Bad Request: chat not found") {
+                                                                        db.run {
+                                                                            getSet<Long>(ENABLED_GROUP).remove(it)
+                                                                            commit()
+                                                                        }
+                                                                        logger.error("Target chat group $it not exists, remove it from Database")
+                                                                    }
                                                                 }
                                                             }
                                                     )

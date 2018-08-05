@@ -24,6 +24,7 @@ Bilibili 直播开播提醒 Telegram 机器人, 当目标直播间(复数)开始
         "username": "czp_bot",
         "token": "381487180:AHFRIcngHfYZ7JihahXVB3zqkqpIUjTQrdk",
         "creatorId": 196664407,
+        "enableLinkPreview": false,
         "httpProxyConfig": {
           "useHttpProxy": false,
           "hostName": "localhost",
@@ -36,9 +37,13 @@ Bilibili 直播开播提醒 Telegram 机器人, 当目标直播间(复数)开始
       "liveRoomIds": [1110317]
     }
 
+logLevel 为日志等级, 默认为 INFO, 可调整为 ERROR, WARN, DEBUG, TRACE.
+
 telegramBotConfig.username 与 telegramBotConfig.token 是从 BotFather 获取的, 如果你还不知道如何创建 Telegram Bot, 请参阅 https://core.telegram.org/bots
 
 telegramBotConfig.creatorId 用于指定谁拥有 Bot 的超级管理员权限, 该用户可以执行 Bot 的数据库导入导出操作, 如果不需要使用这些功能, 可以指定该配置项的值为 0.
+
+telegramBotConfig.enableLinkPreview 用于启用或关闭 [LinkPreview](https://telegram.org/blog/link-preview) 功能.
 
 telegramBotConfig.httpProxyConfig 用于指定 HttpProxy 的启用与设置, 当总开关 useHttpProxy 为 false 时即不使用 HttpProxy.
 

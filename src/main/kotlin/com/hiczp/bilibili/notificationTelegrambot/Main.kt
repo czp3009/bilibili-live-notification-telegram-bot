@@ -110,7 +110,7 @@ fun main(args: Array<String>) {
                             try {
                                 connect()
                             } catch (e: IOException) {
-                                logger.error(e.message)
+                                logger.error(e.toString())
                                 eventBus.post(ConnectionCloseEvent(this))
                             }
                         }
@@ -120,6 +120,7 @@ fun main(args: Array<String>) {
                 }
             })
 
+            val failedRoom = ArrayList<LiveClient>()
             forEach {
                 getLiveClient(eventLoopGroup, it)
                         .registerListener(
@@ -151,8 +152,20 @@ fun main(args: Array<String>) {
                                         }
                                     }
                                 }
-                        )
-                        .connect()
+                        ).run {
+                            try {
+                                connect()
+                            } catch (e: IOException) {
+                                //如果一开始就连不上(此时 Telegram 已连接), 将连不上的房间记录下来然后投入重连队列
+                                failedRoom.add(this)
+                                logger.error("Connect to room $it failed: ${e.message}, we will reconnect after all connection complete")
+                            }
+                        }
+            }
+
+            //对第一次没连上的房间进行重连
+            failedRoom.forEach {
+                delayQueue.put(DelayedElement(it, 0))
             }
         }
     }
