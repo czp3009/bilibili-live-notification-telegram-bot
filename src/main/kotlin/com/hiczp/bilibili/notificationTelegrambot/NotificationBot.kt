@@ -99,8 +99,8 @@ class NotificationBot(username: String,
                                                         else -> "Fetch room info failed: $message"
                                                     }
                                                 } ?: "[ERROR] Server return empty body"
-                                            }.let {
-                                                SendMessage(chatId, it).apply {
+                                            }.let { message ->
+                                                SendMessage(chatId, message).apply {
                                                     if (!ApplicationConfig.config.telegramBotConfig.enableLinkPreview) {
                                                         disableWebPagePreview()
                                                     }
@@ -141,45 +141,45 @@ class NotificationBot(username: String,
                                     return
                                 }
                                 data.run {
-                                    StringBuilder()
-                                            .appendln("Room $showRoomId changed status to $status")
-                                            .appendln("Title: $title")
-                                            .appendln("HostName: $username")
-                                            .appendln("Category: ${buildCategoryString(this)}")
-                                            .appendln(buildUrlString(showRoomId))
-                                            .toString()
-                                            .let { message ->
-                                                forEach {
-                                                    executeAsync(
-                                                            SendMessage(it, message).apply {
-                                                                if (!ApplicationConfig.config.telegramBotConfig.enableLinkPreview) {
-                                                                    disableWebPagePreview()
-                                                                }
-                                                            },
-                                                            object : SentCallback<Message> {
-                                                                override fun onResult(method: BotApiMethod<Message>, response: Message) {
-                                                                    logger.info("Send notification to group $it succeed")
-                                                                }
+                                    forEach {
+                                        executeAsync(
+                                                SendMessage(
+                                                        it,
+                                                        StringBuilder()
+                                                                .appendln("Room $showRoomId changed status to $status")
+                                                                .appendln("Title: $title")
+                                                                .appendln("HostName: $username")
+                                                                .appendln("Category: ${buildCategoryString(this)}")
+                                                                .appendln(buildUrlString(showRoomId))
+                                                                .toString()
+                                                ).apply {
+                                                    if (!ApplicationConfig.config.telegramBotConfig.enableLinkPreview) {
+                                                        disableWebPagePreview()
+                                                    }
+                                                },
+                                                object : SentCallback<Message> {
+                                                    override fun onResult(method: BotApiMethod<Message>, response: Message) {
+                                                        logger.info("Send notification to group $it succeed")
+                                                    }
 
-                                                                override fun onException(method: BotApiMethod<Message>, exception: Exception) {
-                                                                    exception.printStackTrace()
-                                                                    logger.error("Error occurred when push notification to chat group $it")
-                                                                }
+                                                    override fun onException(method: BotApiMethod<Message>, exception: Exception) {
+                                                        exception.printStackTrace()
+                                                        logger.error("Error occurred when push notification to chat group $it")
+                                                    }
 
-                                                                override fun onError(method: BotApiMethod<Message>, apiException: TelegramApiRequestException) {
-                                                                    logger.warn(apiException.message)
-                                                                    if (apiException.apiResponse == "Bad Request: chat not found") {
-                                                                        db.run {
-                                                                            getSet<Long>(ENABLED_GROUP).remove(it)
-                                                                            commit()
-                                                                        }
-                                                                        logger.error("Target chat group $it not exists, remove it from Database")
-                                                                    }
-                                                                }
+                                                    override fun onError(method: BotApiMethod<Message>, apiException: TelegramApiRequestException) {
+                                                        logger.warn(apiException.message)
+                                                        if (apiException.apiResponse == "Bad Request: chat not found") {
+                                                            db.run {
+                                                                getSet<Long>(ENABLED_GROUP).remove(it)
+                                                                commit()
                                                             }
-                                                    )
+                                                            logger.error("Target chat group $it not exists, remove it from Database")
+                                                        }
+                                                    }
                                                 }
-                                            }
+                                        )
+                                    }
                                 }
                             } ?: logger.error("server return empty body")
                         }
@@ -194,16 +194,14 @@ class NotificationBot(username: String,
 
     private fun buildCategoryString(liveRoom: LiveRoomInfoEntity.LiveRoom) =
             liveRoom.run {
-                StringBuilder().run {
-                    append(area)
+                StringBuilder(area).apply {
                     areaV2ParentName.run {
                         if (isNotEmpty()) append(" / $this")
                     }
                     areaV2Name.run {
                         if (isNotEmpty()) append(" / $this")
                     }
-                    toString()
-                }
+                }.toString()
             }
 
     private fun buildUrlString(roomId: Long) =
